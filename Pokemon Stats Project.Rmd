@@ -1,0 +1,820 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(dplyr)
+library(readr)
+library(magrittr)
+```
+
+```{r}
+pokemon <- read_csv("Pokemon.csv", show_col_types = FALSE)
+```
+
+### The first task will be do to some data cleaning
+
+Lets first check the data types and then go from there.
+
+```{r}
+str(pokemon)
+```
+
+Determine if there are any stats that are out of range.
+
+```{r}
+pokemon %>%
+  select(-"#", -"Name", -"Type 1", -"Type 2", -"Legendary") %>%
+  summarise_all(range, na.rm = TRUE)
+```
+
+To knowledge, nothing here seems out of range.
+
+See if there are any missing values:
+
+```{r}
+colSums(is.na(pokemon))
+```
+
+The "Type 2" has 386 missing values. However, this is normal because not every Pokemon has two types.
+
+Check the names of the Pokemon in the "names" column.
+
+```{r}
+pokemon %>%
+  select("Name") %>%
+  filter(grepl("Mega", Name))
+
+```
+
+Consequently, this column will need the Pokemon name to be removed before the "Mega" part.
+
+```{r}
+pokemon$Name <- gsub(".*(Mega)", "\\1", pokemon$Name)
+```
+
+```{r}
+pokemon %>%
+  select("Name") %>%
+  filter(grepl("Mega", Name))
+```
+
+This column was successfully cleaned. There is a row with the Pokemon name, "Meganium", but there is no Mega Meganium in this dataset, so this won't require further attention.
+
+See if there are any types that are out of the ordinary.
+
+```{r}
+pokemon %>%
+  select("Type 1") %>%
+  unique()
+
+pokemon %>%
+  select("Type 2") %>%
+  unique()
+```
+
+Nothing here seems out of the ordinary. The only next step would be to convert the characters to factors.
+
+```{r}
+pokemon <- pokemon %>%
+  mutate(`Type 1` = as.factor(`Type 1`),
+         `Type 2` = as.factor(`Type 2`),
+        # `Legendary` = as.factor(ifelse(`Legendary`, "Yes", "No"))
+         )
+
+head(pokemon)
+```
+
+Now all the data types are converted correctly, and the data is ready for analysis.
+
+### Exploratory Data Analysis
+
+**Main question: What two stats, if any, can predict the type of Pokemon?**
+
+```{r}
+library(ggplot2)
+```
+
+```{r}
+head(pokemon)
+```
+
+Is there a certain type of Pokemon with noticeably different total stats than the others?
+
+```{r}
+ggplot(pokemon, aes(y = `Type 1`, x = Total)) +
+  geom_boxplot()
+```
+
+Dragon and Flying seem to have higher stats than the other Pokemon. In the game, some types tend to have more legendary Pokemon than others. This could possibly skew the analysis. The first step will be to answer a few questions about Legendary Pokemon.
+
+Are non-legendary Pokemon likely to have lower stats than other Pokemon, in general?
+
+```{r}
+legendary <- pokemon %>%
+  group_by(Legendary) %>%
+  summarize(meanTotal = mean(Total),
+         standardDev = sd(Total),
+         number = n())
+legendary
+```
+
+To determine whether this is statistically significant, a t-test will be performed. First, however, the assumptions will be checked: - Is the data normally distributed - Are the samples random subsets of a larger population - Is each observation independent - Are the sample sizes large enough
+
+```{r}
+ggplot(pokemon, aes(x = Total)) +
+  geom_histogram() +
+  facet_wrap(~Legendary) +
+  ggtitle("Total Stats Histogram based on Legendary Status")
+```
+
+Legendary Pokemon do not appear to have a normally distributed stat total, so the data will need to be ranked and non-parametric test will be used.
+
+The most appropriate test would be a Wilcoxon Mann-Whitney test since it is roughly equivalent to a t test, but uses ranked data instead.
+
+```{r}
+wilcox.test(
+  Total ~ Legendary,
+  data = pokemon,
+  alternative = "less",
+  correct = FALSE
+)
+```
+
+This tests shows that non-legendary Pokemon have lower stats than legendary Pokemon, in general.
+
+**So, if that is the case, should we discard legendary Pokemon from the analysis?**
+
+One way to answer this would be to analyze the proportion of legendary Pokemon for each type.
+
+```{r}
+ggplot(pokemon, aes(y = `Type 1`, fill = Legendary)) +
+  geom_bar(position = "fill") +
+  xlab("proportion") +
+  ggtitle("Proportion of Legendary Pokemon by Type 1")
+
+ggplot(pokemon, aes(y = `Type 2`, fill = Legendary)) +
+  geom_bar(position = "fill") +
+  xlab("proportion") +
+  ggtitle("Proportion of Legendary Pokemon by Type 2")
+```
+
+These plots show some Pokemon types have much higher proportions of legendary Pokemon. Let's examine how the Pokemon stats are influenced by legendary status to get a more granular understanding.
+
+```{r}
+ggplot(pokemon, aes(x = HP, fill = Legendary)) +
+  geom_density(alpha = 0.6)
+
+ggplot(pokemon, aes(x = Attack, fill = Legendary)) +
+  geom_density(alpha = 0.6)
+
+ggplot(pokemon, aes(x = Defense, fill = Legendary)) +
+  geom_density(alpha = 0.6)
+
+ggplot(pokemon, aes(x = `Sp. Atk`, fill = Legendary)) +
+  geom_density(alpha = 0.6)
+
+ggplot(pokemon, aes(x = `Sp. Def`, fill = Legendary)) +
+  geom_density(alpha = 0.6)
+
+ggplot(pokemon, aes(x = Speed, fill = Legendary)) +
+  geom_density(alpha = 0.6)
+```
+
+These plots show that overall, each stat is skewed positively depending on legendary status. Since there are disproportionate numbers of legendary Pokemon in each type, would it be better to thus remove the legendary Pokemon from the analysis to prevent skewing? How much data could be affected?
+
+```{r}
+ggplot(pokemon, aes(y = `Type 1`, fill = Legendary)) +
+  geom_bar() +
+  ggtitle("Number of Legendary Pokemon for each type")
+```
+
+```{r}
+propLegendaryByType <- pokemon %>%
+  group_by(`Type 1`) %>%
+  summarize(count = n(),
+            NumLegendary = sum(`Legendary`),
+            propLegendary = round(NumLegendary/count, 2))
+
+propLegendaryByType
+
+legendaryTotal <- data.frame(
+  Total_Pokemon = sum(propLegendaryByType$count),
+  Total_Legendary = sum(propLegendaryByType$NumLegendary)
+)
+
+legendaryTotal <- mutate(legendaryTotal, Prop_Legendary = Total_Legendary/Total_Pokemon)
+
+legendaryTotal
+```
+
+Seeing as Legendary Pokemon only account for 8.1% of the dataset, it might be best to exclude them from the analysis to reduce bias and potential inaccuracy from machine learning models.
+
+```{r}
+pokemon_reg <- pokemon %>%
+  filter(Legendary == FALSE)
+
+dim(pokemon_reg)
+```
+
+The data was successfully filtered to include only regular (reg) Pokemon.
+
+**Do any two stats stand out as potential for being most predictive of Pokemon type?**
+
+```{r}
+ggplot(pokemon_reg, aes(y = `Type 1`, x = Total)) +
+  geom_boxplot() +
+  geom_vline(aes(xintercept = median(Total)), linetype = 2) +
+  labs(caption = "Dashed line inidcates the median Total stat for all Pokemon") +
+  ggtitle("Total stat boxplots segmented by Pokemon Type 1")
+
+ggplot(pokemon_reg, aes(y = `Type 1`, x = HP)) +
+  geom_boxplot(fill = "green") +
+  geom_vline(aes(xintercept = median(HP)), linetype = 2) +
+  labs(caption = "Dashed line inidcates the median HP stat for all Pokemon") +
+  ggtitle("HP stat boxplots segmented by Pokemon Type 1")
+  
+ggplot(pokemon_reg, aes(y = `Type 1`, x = Attack)) +
+  geom_boxplot(fill = "orange") +
+  geom_vline(aes(xintercept = median(Attack)), linetype = 2) +
+  labs(caption = "Dashed line inidcates the median Attack stat for all Pokemon") +
+  ggtitle("Attack stat boxplots segmented by Pokemon Type 1")
+
+ggplot(pokemon_reg, aes(y = `Type 1`, x = Defense)) +
+  geom_boxplot(fill = "blue") +
+  geom_vline(aes(xintercept = median(Defense)), linetype = 2) +
+  labs(caption = "Dashed line inidcates the median Defense stat for all Pokemon") +
+  ggtitle("Defense stat boxplots segmented by Pokemon Type 1")
+
+ggplot(pokemon_reg, aes(y = `Type 1`, x = `Sp. Atk`)) +
+  geom_boxplot(fill = "red") +
+  geom_vline(aes(xintercept = median(`Sp. Atk`)), linetype = 2) +
+  labs(caption = "Dashed line inidcates the median Sp. Atk stat for all Pokemon") +
+  ggtitle("Sp. Atk stat boxplots segmented by Pokemon Type 1")
+
+ggplot(pokemon_reg, aes(y = `Type 1`, x = `Sp. Def`)) +
+  geom_boxplot(fill = "purple") +
+  geom_vline(aes(xintercept = median(`Sp. Def`)), linetype = 2) +
+  labs(caption = "Dashed line inidcates the median Sp. Def stat for all Pokemon") +
+  ggtitle("Sp. Def stat boxplots segmented by Pokemon Type 1")
+
+ggplot(pokemon_reg, aes(y = `Type 1`, x = Speed)) +
+  geom_boxplot(fill = "yellow") +
+  geom_vline(aes(xintercept = median(Speed)), linetype = 2) +
+  labs(caption = "Dashed line inidcates the median Speed stat for all Pokemon") +
+  ggtitle("Speed stat boxplots segmented by Pokemon Type 1")
+```
+
+From initial exploration, there seems to be some separation between differing Type 1 Pokemon based on their Attack and Sp. Atk., moderate separation based on their Speed and Defense, and not much separation based on their HP and Sp. Def.
+
+Could further separation be realized if the Attack and Sp. Attack were combined into a combined Attack, as well as a combined Defense?
+
+```{r}
+combined_stats <- pokemon_reg %>%
+  mutate(combinedAttack = Attack + `Sp. Atk`,
+         combinedDefense = Defense + `Sp. Def`)
+
+ggplot(combined_stats, aes(y = `Type 1`, x = combinedAttack)) +
+  geom_boxplot(fill = "dark red", color = "white") + 
+  theme_dark()
+
+ggplot(combined_stats, aes(y = `Type 1`, x = combinedDefense)) +
+  geom_boxplot(fill = "dark blue", color = "white") +
+  theme_dark()
+```
+
+These combined stats seems to dampen the separation.
+
+Lets look at Attack and Sp. Atk more deeply.
+
+```{r}
+ggplot(pokemon_reg, aes(x = Attack, y = `Sp. Atk`, color = `Type 1`)) +
+  geom_point() +
+  facet_wrap(~`Type 1`) +
+  geom_smooth(method = "lm", se = FALSE)
+```
+
+It appears that Attack and Sp. Atk do have different relationships with each other, which, if the linear models between them are a good fit, could mean that these two stats are the most predictive of Pokemon type.
+
+```{r}
+ggplot(pokemon_reg, aes(x = Attack, y = `Sp. Atk`, color = `Type 1`)) +
+  geom_density_2d(size = 1) +
+  facet_wrap(~`Type 1`)
+
+ggplot(pokemon_reg, aes(x = HP, y = `Sp. Def`, color = `Type 1`)) +
+  geom_density_2d(size = 1) +
+  facet_wrap(~`Type 1`)
+```
+
+**The next step would be to do an analysis of variance (ANOVA) between each Pokemon's Type 1 and their Attack and Sp. Atk, and compare the results with Speed and Defense. However, because the sample size for each Pokemon type is not \>=30 for each Type 1, a Kruskal-Wallis test will be performed (this will convert the data to ranked data and perform the test).**
+
+Attack and Sp. Atk
+
+```{r}
+print("Attack and Type 1")
+kruskal.test(
+  Attack ~ `Type 1`,
+  data = pokemon_reg
+)
+print("Sp. Atk and Type 1")
+kruskal.test(
+  `Sp. Atk` ~ `Type 1`,
+  data = pokemon_reg
+)
+```
+
+The p-values indicate statistical significance, but post-hoc testing will need to be performed to see which groups are different from each other.
+
+```{r}
+library(rstatix)
+```
+
+Post hoc testing
+
+```{r}
+names(pokemon_reg)[names(pokemon_reg) == "Type 1"] <- "Type1"
+
+dunn_test(
+  data = pokemon_reg,
+  formula = Attack ~ Type1,
+  p.adjust.method = "bonferroni") %>%
+  filter(p.adj.signif != "ns")
+
+dunn_test(
+  data = pokemon_reg,
+  formula = `Sp. Atk` ~ Type1,
+  p.adjust.method = "bonferroni") %>%
+  filter(p.adj.signif != "ns")
+```
+
+Speed and Defense
+
+```{r}
+print("Speed and Type 1")
+kruskal.test(
+  Attack ~ Type1,
+  data = pokemon_reg
+)
+print("Defense and Type 1")
+kruskal.test(
+  `Sp. Atk` ~ Type1,
+  data = pokemon_reg
+)
+```
+
+```{r}
+dunn_test(
+  data = pokemon_reg,
+  formula = Speed ~ Type1,
+  p.adjust.method = "bonferroni") %>%
+  filter(p.adj.signif != "ns")
+
+dunn_test(
+  data = pokemon_reg,
+  formula = Defense ~ Type1,
+  p.adjust.method = "bonferroni") %>%
+  filter(p.adj.signif != "ns")
+```
+
+Based on these tests, it looks like Speed is out of the running. Thus, the top 3 stats to test for in predictive modeling would be Attack, Sp. Atk, and Defense.
+
+### Modeling
+
+Before any modeling is done the data should be standardized for good measure.
+
+The standard = (xi - xbar)/st_dev
+
+The data should also be split into train and test datasets (an 80/20 split will be used).
+
+Separate datasets will be created that use Attack and Sp. Atk, Attack and Defense, and Defense and Sp. Atk. The label will be included in the dataset.
+
+```{r}
+library(tidyr)
+library(tidymodels)
+```
+
+```{r}
+#scale the data
+Attack_SpAtk <- pokemon_reg %>%
+  select(Type1, Attack, `Sp. Atk`) %>%
+  mutate(Attack = scale(Attack, center = TRUE, scale = TRUE)) %>%
+  mutate(`Sp. Atk` = scale(`Sp. Atk`, center = TRUE, scale = TRUE))
+
+Attack_Def <- pokemon_reg %>%
+  select(Type1, Attack, Defense) %>%
+  mutate(Attack = scale(Attack, center = TRUE, scale = TRUE)) %>%
+  mutate(Defense = scale(Defense, center = TRUE, scale = TRUE))
+
+Def_SpAtk <- pokemon_reg %>%
+  select(Type1, Defense, `Sp. Atk`) %>%
+  mutate(Defense = scale(Defense, center = TRUE, scale = TRUE)) %>%
+  mutate(`Sp. Atk` = scale(`Sp. Atk`, center = TRUE, scale = TRUE))
+
+#Create train-test splits
+set.seed(123)
+Attack_SpAtk_Split <- initial_split(Attack_SpAtk, prop = 0.80)
+Attack_SpAtk_Train <- training(Attack_SpAtk_Split)
+Attack_SpAtk_Test <- testing(Attack_SpAtk_Split)
+
+Attack_Def_Split <- initial_split(Attack_Def, prop = 0.80)
+Attack_Def_Train <- training(Attack_Def_Split)
+Attack_Def_Test <- testing(Attack_Def_Split)
+
+Def_SpAtk_Split <- initial_split(Def_SpAtk, prop = 0.80)
+Def_SpAtk_Train <- training(Def_SpAtk_Split)
+Def_SpAtk_Test <- testing(Def_SpAtk_Split)
+```
+
+Now create the decision tree models
+
+```{r}
+library(rpart)
+library(rpart.plot)
+```
+
+```{r}
+Attack_SpAtk_mdl <- rpart(`Type1` ~ `Attack` + `Sp. Atk`, data = Attack_SpAtk_Train, method = "class")
+Attack_Def_mdl <- rpart(`Type1` ~ `Attack` + `Defense`, data = Attack_Def_Train, method = "class")
+Def_SpAtk_mdl <- rpart(`Type1` ~ `Defense` + `Sp. Atk`, data = Def_SpAtk_Train, method = "class")
+```
+
+Visualize the decision trees
+
+```{r}
+rpart.plot(Attack_SpAtk_mdl, fallen.leaves = TRUE)
+rpart.plot(Attack_Def_mdl, fallen.leaves = TRUE)
+rpart.plot(Def_SpAtk_mdl, fallen.leaves = TRUE)
+
+# par(xpd = TRUE)
+# plot(Attack_SpAtk_mdl, compress = TRUE)
+# text(Attack_SpAtk_mdl, use.n = FALSE)
+# 
+# par(xpd = TRUE)
+# plot(Attack_Def_mdl, compress = TRUE)
+# text(Attack_Def_mdl, use.n = FALSE)
+# 
+# par(xpd = TRUE)
+# plot(Def_SpAtk_mdl, compress = TRUE)
+# text(Def_SpAtk_mdl, use.n = FALSE)
+```
+
+These plots suggest that the decision tree model is not very robust. However, lets evaluate them before giving a clear answer.
+
+```{r}
+Attack_SpAtk_Test$pred <- predict(Attack_SpAtk_mdl, Attack_SpAtk_Test, type = "class")
+table(Attack_SpAtk_Test$pred, Attack_SpAtk_Test$Type1)
+print("Accuracy: ", )
+mean(Attack_SpAtk_Test$pred == Attack_SpAtk_Test$Type1)
+```
+
+Indeed the accuracy is quite low, at 18.3% for the Attack and Sp. Atk model. Next the Attack and Defense model will be evaluated.
+
+```{r}
+Attack_Def_Test$pred <- predict(Attack_Def_mdl, Attack_Def_Test, type = "class")
+table(Attack_Def_Test$pred, Attack_Def_Test$Type1)
+print("Accuracy: ", )
+mean(Attack_Def_Test$pred == Attack_Def_Test$Type1)
+```
+
+The accuracy for this model is 12.9%. Finally, let's examine the Defense and Sp. Atk model
+
+```{r}
+Def_SpAtk_Test$pred <- predict(Def_SpAtk_mdl, Def_SpAtk_Test, type = "class")
+table(Def_SpAtk_Test$pred, Def_SpAtk_Test$Type1)
+print("Accuracy: ", )
+mean(Def_SpAtk_Test$pred == Def_SpAtk_Test$Type1)
+```
+
+This model had an accuracy of 23.1% which is higher than the other models, but still very low overall.
+
+**Next a k-NN model will be tried**
+
+```{r}
+library(class)
+```
+
+```{r}
+pokemon_types <- Attack_SpAtk_Train$Type1
+
+Attack_SpAtk_Pred <- knn(Attack_SpAtk_Train[,2:3], Attack_SpAtk_Test[,2:3], cl = pokemon_types, k = 24)
+Attack_Def_Pred <- knn(Attack_Def_Train[,2:3], Attack_Def_Test[,2:3], cl = pokemon_types, k = 24)
+Def_SpAtk_Pred <- knn(Def_SpAtk_Train[,2:3], Def_SpAtk_Test[,2:3], cl = pokemon_types, k = 24)
+```
+
+```{r}
+Attack_SpAtk_Actual <- Attack_SpAtk_Test$Type1
+Attack_Def_Actual <- Attack_Def_Test$Type1
+Def_SpAtk_Actual <- Def_SpAtk_Test$Type1
+```
+
+Attack and Sp. Atk:
+
+```{r}
+table(Attack_SpAtk_Pred, Attack_SpAtk_Actual)
+mean(Attack_SpAtk_Pred == Attack_SpAtk_Actual)
+```
+
+Attack and Defense:
+
+```{r}
+table(Attack_Def_Pred, Attack_Def_Actual)
+mean(Attack_Def_Pred == Attack_Def_Actual)
+```
+
+Defense and Sp. Atk:
+
+```{r}
+table(Def_SpAtk_Pred, Def_SpAtk_Actual)
+mean(Def_SpAtk_Pred == Def_SpAtk_Actual)
+```
+
+Overall, kNN appears to have worse performance than the decision tree.
+
+**Next, a random forest will be tried**
+
+```{r}
+library(randomForest)
+```
+
+```{r}
+names(Attack_SpAtk_Train)[names(Attack_SpAtk_Train) == "Sp. Atk"] <- "SpAtk"
+names(Def_SpAtk_Train)[names(Def_SpAtk_Train) == "Sp. Atk"] <- "SpAtk"
+
+Attack_SpAtk_rf <- randomForest(`Type1` ~ `Attack` + `SpAtk`, data = Attack_SpAtk_Train)
+Attack_Def_rf <- randomForest(`Type1` ~ `Attack` + `Defense`, data = Attack_Def_Train)
+Def_SpAtk_rf <- randomForest(`Type1` ~ `Defense` + `SpAtk`, data = Def_SpAtk_Train)
+
+```
+
+```{r}
+names(Attack_SpAtk_Test)[names(Attack_SpAtk_Test) == "Sp. Atk"] <- "SpAtk"
+names(Def_SpAtk_Test)[names(Def_SpAtk_Test) == "Sp. Atk"] <- "SpAtk"
+
+Attack_SpAtk_Test$pred_rf <- predict(Attack_SpAtk_rf, newdata = Attack_SpAtk_Test)
+Attack_Def_Test$pred_rf <- predict(Attack_Def_rf, newdata = Attack_Def_Test)
+Def_SpAtk_Test$pred_rf <- predict(Def_SpAtk_rf, newdata = Def_SpAtk_Test)
+```
+
+```{r}
+Attack_SpAtk_rf_Actual <- Attack_SpAtk_Test$Type1
+Attack_Def_rf_Actual <- Attack_Def_Test$Type1
+Def_SpAtk_rf_Actual <- Def_SpAtk_Test$Type1
+```
+
+Assessing Attack and Sp. Atk with random forest:
+
+```{r}
+table(Attack_SpAtk_Test$pred_rf, Attack_SpAtk_rf_Actual)
+print("Accuracy: ")
+mean(Attack_SpAtk_Test$pred_rf == Attack_SpAtk_rf_Actual)
+```
+
+Assessing Attack and Defense with random forest:
+
+```{r}
+table(Attack_Def_Test$pred_rf, Attack_Def_Actual)
+print("Accuracy: ")
+mean(Attack_Def_Test$pred_rf == Attack_Def_Actual)
+```
+
+Assessing Defense and Sp. Atk:
+
+```{r}
+table(Def_SpAtk_Test$pred_rf, Def_SpAtk_Actual)
+print("Accuracy: ")
+mean(Def_SpAtk_Test$pred_rf == Def_SpAtk_Actual)
+```
+
+**After examining the model plots and the model scores, its apparent that the models struggle to delineate between Pokemon types off just two stats alone. According to the model plots, the model could delineate between Water, Bug, Normal, and Psychic for Attack and Sp. Atk, Water, Normal, and Psychic for Attack and Defense, and Water, Normal, Bug, and Rock for Defense and Sp. Atk. All three models could not determine any other types, leaving out 14-15 types of Pokemon each time from its predictions. It is no surprise then, that the accuracy for all corresponding models are so low.**
+
+**Therefore, this is evidence that no two stats alone can predict the type of Pokemon. However, to know for certain, a decision tree model with all the features should be built, and the corresponding feature importance should be calculated.**
+
+### Decision Tree Model With All Pokemon Stats Included
+
+```{r}
+#Create a new train test split for Pokemon with all features except legendary status
+pokemon_all_stats <- pokemon_reg %>%
+  select(-Name, -`Type 2`, -Total, -Generation, -Legendary)
+
+set.seed(456)
+train_test_split <- initial_split(pokemon_all_stats, prop = 0.80)
+pokemon_all_stats_train <- training(train_test_split)
+pokemon_all_stats_test <- testing(train_test_split)
+```
+
+```{r}
+# Create a decision tree model
+pokemon_all_stats_mdl <- rpart(`Type1` ~ ., data = pokemon_all_stats_train, method = 'class')
+rpart.plot(pokemon_all_stats_mdl, fallen.leaves = TRUE)
+```
+
+```{r}
+pokemon_all_stats_test$pred <- predict(pokemon_all_stats_mdl, pokemon_all_stats_test, type = "class")
+
+table(pokemon_all_stats_test$pred, pokemon_all_stats_test$Type1)
+print("Accuracy: ")
+mean(pokemon_all_stats_test$pred == pokemon_all_stats_test$Type1)
+```
+
+**This is still a very poor accuracy. Surprisingly, it is lower than the decision tree model that was just built on Defense and Sp. Atk. Is it possible that overfitting is taking place?**
+
+```{r}
+pokemon_all_stats_train$pred <- predict(pokemon_all_stats_mdl, pokemon_all_stats_train, type = "class")
+table(pokemon_all_stats_train$pred, pokemon_all_stats_train$Type1)
+print("Accuracy: ")
+mean(pokemon_all_stats_train$pred == pokemon_all_stats_train$Type1)
+
+```
+
+It is possible that overfitting is taking place since the accuracy of predictions on the training data is 10.3 percent higher than the accuracy of the predictions on the testing data. However, the model accuracy on the training data is still low to begin with, not much better blindly guessing the correct answer on a multiple choice question with four possible answers.
+
+The next question to investigate is what would the model accuracy be if the data was more balanced?
+
+The reason this question is being asked is because the model notably makes a lot of Water type predictions. **What is the proportion of water types being represented as opposed other types?**
+
+```{r}
+ggplot(pokemon_all_stats, aes(y = `Type1`)) +
+  geom_bar(fill = "blue")
+```
+
+As such, there are an overwhelmingly high number of water type Pokemon present within the dataset, approximately 110. There are approximately 95 normal type Pokemon in the dataset, approximately 68 bug type Pokemon, approximately 66 grass type Pokemon, and approximately 47 fire type Pokemon. The rest of the Pokemon do not surpass 45 in count. Resampling the types could be more useful, **but we would be throwing out data.** However, there are plenty of examples of Pokemon that have more than one type. Because the models do not achieve high accuracy the primary type of Pokemon, the primary and secondary types will be combined. This will do two things: generate more granular labels and hopefully a more balanced dataset. This will make the models more complex and computationally expensive but it could result in higher accuracy, so it is worth attempting.
+
+```{r}
+# Merge the types together
+pokemon_alltypes_combined <- pokemon_reg %>%
+  mutate(`Type1` = as.character(`Type1`)) %>%
+  mutate(`Type 2` = as.character(`Type 2`)) %>%
+  mutate(Type = paste(`Type1`, `Type 2`, sep = ", ")) %>%
+  mutate(Type = gsub(", NA", "", Type))
+
+# Visualize the count of each type
+ggplot(pokemon_alltypes_combined, aes(y = Type)) +
+  geom_bar(fill = "blue")
+
+```
+
+This graph, while unreadably crowded, shows that there is a very diverse number of Pokemon type combinations, and their respective prevalence varies widely. What if we were to visualize the types that only had at least 10 Pokemon in its respective category?
+
+```{r}
+pokemon_combined_type_counts_filtered <- pokemon_alltypes_combined %>%
+  group_by(Type) %>%
+  count() %>%
+  filter(n >= 10)
+
+ggplot(pokemon_combined_type_counts_filtered, aes(x = n, y = Type)) +
+  geom_col(fill = "blue")
+
+```
+
+This does make the type categorization more granular and should ease some of the data imbalancing, but there is still a considerable amount of imbalanced data - as the number of Normal and Water type Pokemon, often are more than triple the amount of the other types of Pokemon.
+
+Let's investigate what effect this has on stat separation particularly for Attack, Defense, Sp. Attack, and Speed to see if this will change any of the modeling decisions. We will still only display types that have at least 10 members in them for simplicity.
+
+```{r}
+types_more_than_10_pokemon <- pokemon_combined_type_counts_filtered$Type
+
+pokemon_alltypes_combined_filtered <- pokemon_alltypes_combined %>%
+  filter(Type %in% types_more_than_10_pokemon)
+
+ggplot(pokemon_alltypes_combined_filtered, aes(y = Type, x = HP)) +
+  geom_boxplot(fill = "green") +
+  geom_vline(aes(xintercept = median(HP)), linetype = 2) +
+  labs(caption = "Dashed line inidcates the median HP stat for all Pokemon") +
+  ggtitle("Attack stat boxplots segmented by Pokemon Type")
+
+ggplot(pokemon_alltypes_combined_filtered, aes(y = Type, x = Attack)) +
+  geom_boxplot(fill = "orange") +
+  geom_vline(aes(xintercept = median(Attack)), linetype = 2) +
+  labs(caption = "Dashed line inidcates the median Attack stat for all Pokemon") +
+  ggtitle("Attack stat boxplots segmented by Pokemon Type")
+
+ggplot(pokemon_alltypes_combined_filtered, aes(y = Type, x = Defense)) +
+  geom_boxplot(fill = "blue") +
+  geom_vline(aes(xintercept = median(Defense)), linetype = 2) +
+  labs(caption = "Dashed line inidcates the median Defense stat for all Pokemon") +
+  ggtitle("Attack stat boxplots segmented by Pokemon Type")
+
+ggplot(pokemon_alltypes_combined_filtered, aes(y = Type, x = `Sp. Atk`)) +
+  geom_boxplot(fill = "red") +
+  geom_vline(aes(xintercept = median(`Sp. Atk`)), linetype = 2) +
+  labs(caption = "Dashed line inidcates the median Sp. Atk stat for all Pokemon") +
+  ggtitle("Attack stat boxplots segmented by Pokemon Type")
+
+ggplot(pokemon_alltypes_combined_filtered, aes(y = Type, x = `Sp. Def`)) +
+  geom_boxplot(fill = "purple") +
+  geom_vline(aes(xintercept = median(`Sp. Def`)), linetype = 2) +
+  labs(caption = "Dashed line inidcates the median Sp. Def stat for all Pokemon") +
+  ggtitle("Attack stat boxplots segmented by Pokemon Type")
+
+ggplot(pokemon_alltypes_combined_filtered, aes(y = Type, x = Speed)) +
+  geom_boxplot(fill = "yellow") +
+  geom_vline(aes(xintercept = median(Speed)), linetype = 2) +
+  labs(caption = "Dashed line inidcates the median Speed stat for all Pokemon") +
+  ggtitle("Attack stat boxplots segmented by Pokemon Type")
+
+```
+
+From these boxplots, there is clear separation among the Pokemon types with the Sp. Atk stat. The separation seems less clear among the Defense, Sp. Def, and Speed stats.
+
+```{r}
+print("Defense")
+kruskal.test(
+  Defense ~ Type,
+  data = pokemon_alltypes_combined_filtered
+)
+
+dunn_test(
+  data = pokemon_alltypes_combined_filtered,
+  formula = Defense ~ Type,
+  p.adjust.method = "bonferroni") %>%
+  filter(p.adj.signif != "ns")
+```
+
+```{r}
+print("Sp. Def")
+kruskal.test(
+  `Sp. Def` ~ Type,
+  data = pokemon_alltypes_combined_filtered
+)
+
+dunn_test(
+  data = pokemon_alltypes_combined_filtered,
+  formula = `Sp. Def` ~ Type,
+  p.adjust.method = "bonferroni") %>%
+  filter(p.adj.signif != "ns")
+```
+
+```{r}
+print("Speed")
+kruskal.test(
+  Speed ~ Type,
+  data = pokemon_alltypes_combined_filtered
+)
+
+dunn_test(
+  data = pokemon_alltypes_combined_filtered,
+  formula = Speed ~ Type,
+  p.adjust.method = "bonferroni") %>%
+  filter(p.adj.signif != "ns")
+```
+
+While Defense did not show any significance between types, Sp. Def and Speed did show significance between types. Since Sp. Def showed slightly higher statistical significance between the groups, if any two stats are going to predict the type of Pokemon, it will be Sp. Atk and Sp. Def
+
+**Now the decision tree model will be built with just Sp. Atk and Sp. Def as features**
+
+```{r}
+pokemon_alltypes_combined_SpAtk_SpDef <- pokemon_alltypes_combined %>%
+    select(Type, `Sp. Atk`, `Sp. Def`)
+
+set.seed(789)
+train_test_split <- initial_split(pokemon_alltypes_combined_SpAtk_SpDef, prop = 0.80)
+pokemon_alltypes_combined_SpAtk_SpDef_train <- training(train_test_split)
+pokemon_alltypes_combined_SpAtk_SpDef_test <- testing(train_test_split)
+
+
+```
+
+```{r}
+alltypes_SpAtk_SpDef_mdl <- rpart(Type ~ `Sp. Atk` + `Sp. Def`, data = pokemon_alltypes_combined_SpAtk_SpDef_train, method = 'class')
+
+pokemon_alltypes_combined_SpAtk_SpDef_test$pred <- predict(alltypes_SpAtk_SpDef_mdl, newdata = pokemon_alltypes_combined_SpAtk_SpDef_test, type = 'class')
+
+table(pokemon_alltypes_combined_SpAtk_SpDef_test$pred, pokemon_alltypes_combined_SpAtk_SpDef_test$Type)
+
+print("Accuracy: ")
+mean(pokemon_alltypes_combined_SpAtk_SpDef_test$pred == pokemon_alltypes_combined_SpAtk_SpDef_test$Type)
+```
+
+The accuracy presented is quite low here, so let's see what the accuracy is if all features are included.
+
+```{r}
+pokemon_alltypes_allstats <- pokemon_alltypes_combined %>%
+  select(Type, HP, Attack, Defense, `Sp. Atk`, `Sp. Def`, Speed)
+
+train_test_split <- initial_split(pokemon_alltypes_allstats, prop = 0.80)
+pokemon_alltypes_allstats_train <- training(train_test_split)
+pokemon_alltypes_allstats_test <- testing(train_test_split)
+```
+
+```{r}
+pokemon_alltypes_allstats_mdl <- rpart(Type ~ ., data = pokemon_alltypes_allstats_train, method = 'class')
+
+pokemon_alltypes_allstats_test$pred = predict(pokemon_alltypes_allstats_mdl, newdata = pokemon_alltypes_allstats_test, type = 'class')
+
+table(pokemon_alltypes_allstats_test$pred, pokemon_alltypes_allstats_test$Type)
+print("Accuracy: ")
+mean(pokemon_alltypes_allstats_test$pred == pokemon_alltypes_allstats_test$Type)
+```
+
+Even with all stats combined, the model only reached an accuracy of 15%.
+
+**Thus, there does not seem to be any one set of two Pokemon stats that is able to predict the type of Pokemon.**
+
+### Conclusion
+
+The aim of this project was to analyze a Pokemon stats dataset and to determine which two stats, if any, could predict the type of Pokemon. The project proceeded by analyzing ways to create less skewing in the dataset and found that removing legendary Pokemon would reduce bias towards a type. The project then analyzed the various stats for separation and grouping, finding that Defense and Sp. Atk could potentially predict the Type of Pokemon. After building decision tree, kNN, and random forest models and finding that the maximum arrucary was only around 23%, the project then pivoted to analyze the stats while taking the Pokemon's primary and secondary types into account, in an attempt to build a better model. Re-analyzing the Pokemon stats across primary and secondary types revealed potential separation between the Sp. Atk and Sp. Def stats, and a decision tree model was built. Evaluating this model revealed an 8% accuracy, so all of the Pokemon stats were used in a new decision tree model for comparison. This final decision tree model produced an accuracy of \~16%. With all the data gathered, it is evident that there are no single two statistics that can predict the type of Pokemon.
+
+## Next steps
+
+Throughout the project, data imbalances appeared to be quite present, with some Pokemon types such as Water and Normal often being over triple in size of other Pokemon types. It would be interesting to see how the accuracy of the models changed if each type was represented equally in the training data, and how that would affect the model's performance.
