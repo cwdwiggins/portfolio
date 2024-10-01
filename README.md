@@ -11,9 +11,8 @@ B.S. Bioengineering w/ Cum Laude honors from University of Maryland, College Par
 - Built linear regression, random forest regression, and decision tree regression models and manually calculated their R-squared values for performance comparison
 - Experimented with explanatory variable interactions and how they affected model performance
 - Selected a best performing model and created diagnostic plots for easier understanding of the model's effectiveness  <br>
-![](/images/Boxplot_of_flight_route_and_respective_airlines_with_prices.png)
-![](/images/Decision_tree_model.png)
-![](/images/Diagnostic_plots.png)
+![](images/Flight_Prices_Project/Flight_Route_Airline_Boxplot.png)
+![](images/Flight_Prices_Project/Decision_Tree_Mdl.png)
 
 ### Project 2: Pokemon Type Classification Using Pokemon Stats in R
 
