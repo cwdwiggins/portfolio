@@ -19,3 +19,4 @@ B.S. Bioengineering w/ Cum Laude honors from University of Maryland, College Par
 - Determined two candidate stats and build Decision Tree, k-Nearest Neighbors, and Random Forest models for comparison
 - Created more granular labels based off initial modeling results to attempt a higher model accuracy
 - Re-built the models, analyzed performance, and identified next steps for greater improvement
+![](images/Pokemon_Stats_Project/Type_Combined_Sp_Atk.png)
