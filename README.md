@@ -14,5 +14,8 @@ B.S. Bioengineering w/ Cum Laude honors from University of Maryland, College Par
 ![](images/Flight_Prices_Project/Flight_Route_Airline_Boxplot.png)
 ![](images/Flight_Prices_Project/Decision_Tree_Mdl.png)
 
-### Project 2: Pokemon Type Classification Using Pokemon Stats in R
-
+### [Project 2: Pokemon Type Classification Using Pokemon Stats in R](https://cwdwiggins.github.io/Pokemon-Stats-Project/)
+- Used a Kaggle.com dataset that contained information on Pokemon six Pokemon stats to predict the type of Pokemon based off two stats only
+- Determined two candidate stats and build Decision Tree, k-Nearest Neighbors, and Random Forest models for comparison
+- Created more granular labels based off initial modeling results to attempt a higher model accuracy
+- Re-built the models, analyzed performance, and identified next steps for greater improvement
