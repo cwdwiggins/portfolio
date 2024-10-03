@@ -1,8 +1,8 @@
 # Aspiring Data Scientist
 
 ## Education
-Post-Bacc Data Science Certificate from University of Maryland, Baltimore County (May 2024)<br>
-B.S. Bioengineering w/ Cum Laude honors from University of Maryland, College Park (May 2022)
+- Post-Bacc Certificate, Data Science | University of Maryland, Baltimore County (_May 2024_)<br>
+- B.S., Bioengineering, Cum Laude | University of Maryland, College Park (_May 2022_)
 
 ## Projects
 ### [Project 1: Flight Price Prediction Using Regression in R](https://cwdwiggins.github.io/Flight-Price-Project/)
