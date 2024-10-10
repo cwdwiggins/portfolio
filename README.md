@@ -5,7 +5,7 @@
 - B.S., Bioengineering, Cum Laude - University of Maryland, College Park (_May 2022_)
 
 ## Projects
-### [Project 1: Classification Model to Predict and Employee's Resignation](https://github.com/cwdwiggins/DS602/blob/main/midterm/DATA_602_Midterm_Notebook.ipynb)
+### [Project 1: Classification Model to Predict and Employee's Resignation with Python](https://github.com/cwdwiggins/DS602/blob/main/midterm/DATA_602_Midterm_Notebook.ipynb)
 - Performed exploratory data analysis to uncover factors contributing to an employee's resignation using Python and data visualization packages such as Matplotlib and Seaborn
 - Developed a pre-processing data pipeline to clean and prepare numerical and categorical features for modeling
 - Compared performance of logistic regression, decision tree, and random forest models based on their F1-score for predicting an employee’s resignation and used cross-validation to identify optimal hyperparameters
