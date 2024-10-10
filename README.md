@@ -10,6 +10,7 @@
 - Developed a pre-processing data pipeline to clean and prepare numerical and categorical features for modeling
 - Compared performance of logistic regression, decision tree, and random forest models based on their F1-score for predicting an employee’s resignation and used cross-validation to identify optimal hyperparameters
 - Selected a final model and evaluated its performance on training and testing data by creating a confusion matrix and a Reciever Operating Characteristic (ROC) curve
+![](images/Employee_Resignation_Project/ROC_Curve.png)
 
 ### [Project 2: Flight Price Prediction Using Regression in R](https://cwdwiggins.github.io/Flight-Price-Project/)
 - Obtained a dataset from Kaggle.com that contained information on flight details and fares in India
