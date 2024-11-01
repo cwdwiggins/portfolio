@@ -1,4 +1,4 @@
-# Aspiring Data Scientist
+# Data Scientist
 
 ## Education
 - Post-Bacc Certificate, Data Science - University of Maryland, Baltimore County (_May 2024_)<br>
