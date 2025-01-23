@@ -5,7 +5,7 @@
 - B.S., Bioengineering, Cum Laude - University of Maryland, College Park (_May 2022_)
 
 ## Projects
-### [Project 1: Yelp Sentiment Analysis and Classification](https://github.com/cwdwiggins/Yelp_Sentiment_Analysis_Project)
+### [Project 1: Yelp Sentiment Analysis with NLP in Python](https://github.com/cwdwiggins/Yelp_Sentiment_Analysis_Project)
 - Used an Apple App Store API to scrape 20,000 reviews about Yelp and save it to the disk
 - Conducted extensive preprocessing and exploratory data analysis (EDA), identifying language patterns and insights into extreme and neutral sentiments
 - Used the gensim package to train a neural network on the Yelp corpus and utilized the resulting word embeddings to enhance classification model performance
