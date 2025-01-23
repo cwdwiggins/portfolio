@@ -10,7 +10,7 @@
 - Conducted extensive preprocessing and exploratory data analysis (EDA), identifying language patterns and insights into extreme and neutral sentiments
 - Used the gensim package to train a neural network on the Yelp corpus and utilized the resulting word embeddings to enhance classification model performance
 - Built and multiple machine learning models and controlled overfitting using regularization, yielding model accuracies of 92% for binary classfication and 48% for multiclass classifcation
-![](images/)    
+![](images/Sentiment_Analysis_Project/Log_Reg_Model.png)    
 
 ### [Project 2: Classification Model to Predict and Employee's Resignation with Python](https://github.com/cwdwiggins/DS602/blob/main/midterm/DATA_602_Midterm_Notebook.ipynb)
 - Performed exploratory data analysis to uncover factors contributing to an employee's resignation using Python and data visualization packages such as Matplotlib and Seaborn
