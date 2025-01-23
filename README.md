@@ -9,7 +9,7 @@
 - Used an Apple App Store API to scrape 20,000 reviews about Yelp and save it to the disk
 - Conducted extensive preprocessing and exploratory data analysis (EDA), identifying language patterns and insights into extreme and neutral sentiments
 - Used the gensim package to train a neural network on the Yelp corpus and utilized the resulting word embeddings to enhance classification model performance
-- Built and multiple machine learning models and controlled overfitting using regularization, yielding model accuracies of 92% for binary classfication and 48% for multiclass classifcation
+- Built and multiple machine learning models and controlled overfitting using regularization, yielding model accuracies of 92% for binary classfication and 48% for multiclass classifcation     
 ![](images/Sentiment_Analysis_Project/Log_Reg_Model.png)    
 
 ### [Project 2: Classification Model to Predict and Employee's Resignation with Python](https://github.com/cwdwiggins/DS602/blob/main/midterm/DATA_602_Midterm_Notebook.ipynb)
